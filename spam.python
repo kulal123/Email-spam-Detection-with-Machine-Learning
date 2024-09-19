@@ -1,0 +1,76 @@
+import pandas as pd
+
+# Load the dataset
+data_path = '/content/spam.csv'
+data = pd.read_csv(data_path, encoding='latin-1')
+
+# Display the first few rows of the dataset to understand its structure
+print(data.head())
+
+# Check the columns in the dataset
+print(data.columns)
+# Drop irrelevant columns
+data = data[data.columns[0:2]]
+
+# Rename columns for clarity
+data.columns = ['label', 'email']
+
+# Check for missing values
+print(data.isnull().sum())
+
+# Drop any missing values if they exist
+data.dropna(inplace=True)
+
+
+import nltk
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+import re
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+# Preprocessing functions
+nltk.download('stopwords')
+nltk.download('wordnet')
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+
+def preprocess_text(text):
+    text = re.sub(r'\W', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    text = text.lower()
+    words = text.split()
+    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]
+    return ' '.join(words)
+
+# Apply preprocessing
+data['cleaned_text'] = data['email'].apply(preprocess_text)
+
+# Feature extraction using TF-IDF
+vectorizer = TfidfVectorizer(max_features=3000)
+X = vectorizer.fit_transform(data['cleaned_text']).toarray()
+y = data['label'].map({'spam': 1, 'ham': 0})  # Convert labels to binary
+
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train model
+model = MultinomialNB()
+model.fit(X_train, y_train)
+
+# Predict and evaluate
+y_pred = model.predict(X_test)
+print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+print(confusion_matrix(y_test, y_pred))
+print(classification_report(y_test, y_pred))
+
+
+sample_email = ["Congratulations! You've won a free ticket to the Bahamas. Click here to claim."]
+sample_email_cleaned = preprocess_text(sample_email[0])
+sample_email_vectorized = vectorizer.transform([sample_email_cleaned])
+prediction = model.predict(sample_email_vectorized)
+print("Spam" if prediction[0] == 1 else "Not Spam")
+
